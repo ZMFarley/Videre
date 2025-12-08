@@ -1,0 +1,1 @@
+Due to issues in running pytorch with 3.13, this project must be ran in a virtual enviornment, using python 3.11, create the folder using python3.11 -m venv .venv and .\.venv\Scripts\activate, deactivate to turn it off
