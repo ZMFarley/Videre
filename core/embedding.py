@@ -6,7 +6,8 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from datasets import load_dataset
-import time 
+import time
+from pathlib import Path
 #Loading Pretrained/Frozen embedders
 model = SiglipVisionModel.from_pretrained("google/siglip-base-patch16-224")
 processor = AutoImageProcessor.from_pretrained("google/siglip-base-patch16-224", use_fast = True)
@@ -39,8 +40,33 @@ for index, row in enumerate(midjourney_ai_images):
         batch.clear()
 #Save the embeddings for temporary use
 np.save("embeddings_midjourney", embeddings)
+
+coco_images = Path(r"C:\Users\zacha\projects\CIS430\Videre\core\val2017").glob('*.jpg')
+coco_list = []
+for index, image in enumerate(coco_images):
+    if(index < 1000):
+        coco_list.append(image)
+    else:
+        break
+batch = []
+coco_embedding_list = []
+for index, row in enumerate(coco_list):
+    if (len(batch) < 128):
+        batch.append(Image.open(coco_list[index]).convert("RGB"))
+    else:
+        with torch.no_grad():
+            inputs = processor(images=batch, return_tensors="pt").to(device)
+            outputs = model(**inputs)
+        #Convert the tensor to a numpy array for storage 
+        embeddings = outputs.pooler_output.detach().cpu().numpy()
+        coco_embedding_list.append(embeddings)
+        batch.clear()
+#Save the embeddings for temporary use
+np.save("embeddings_coco", embeddings)
+
 '''
 
+#for i in range (1000):
 clf = LogisticRegression()
 
 #Helper function to load in model 
@@ -59,7 +85,7 @@ def convert_input_image(input):
     image = Image.open(input)
     #Disables gradient calculation as we are only embedding vectors, no need for model training
     with torch.no_grad():
-        inputs = processor(images=image, return_tensors="pt")
+        inputs = processor(images=image, return_tensors="pt").to(device)
         outputs = model(**inputs)
 
     #Convert the tensor to a numpy array for storage 
