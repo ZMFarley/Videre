@@ -10,6 +10,9 @@ import time
 from pathlib import Path
 import os 
 import joblib
+from itertools import islice
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve, RocCurveDisplay
+import matplotlib.pyplot as plt
 
 #Loading Pretrained/Frozen embedders
 model = SiglipVisionModel.from_pretrained("google/siglip-base-patch16-224")
@@ -165,8 +168,154 @@ def create_embeddings_and_classifier():
 
     joblib.dump(clf, "test_classifier.joblib")
 
+#Function to begin the testing of the classifer and to produce relevant metrics pertineant to the project
 def test_classifier():
-    print("in progress")
+    #load in relevant datasets
+    #This is the saved code used to load in my corresponding datasets. They were frozen in comments for later refactoring while i 
+    #Began iterating the progress on my overarching project 
+    #Obtained from https://huggingface.co/datasets/ideepankarsharma2003/AIGeneratedImages_Midjourney
+    midjourney_ai_images = load_dataset("ideepankarsharma2003/AIGeneratedImages_Midjourney", split ="test", streaming = True)
+    midjourney_list = []
+    batch = []
+
+    for index, row in enumerate(midjourney_ai_images):
+        if (len(batch) < 128 and index != 500):
+            batch.append(row["image"])
+        if (index == 500):
+            break
+        else:
+            with torch.no_grad():
+                inputs = processor(images=batch, return_tensors="pt").to(device)
+                outputs = model(**inputs)
+            #Convert the tensor to a numpy array for storage 
+            embeddings = outputs.pooler_output.detach().cpu().numpy()
+            midjourney_list.append(embeddings)
+            batch.clear()
+    #Save the embeddings for temporary use
+    midjourney_matrix = np.concatenate(midjourney_list, axis = 0)
+
+    coco_images = Path(r"C:\Users\zacha\projects\CIS430\Videre\core\val2017").glob('*.jpg')
+    coco_list = []
+    for index, image in enumerate(islice(coco_images, 1000, 1500)):
+        if(index < 500):
+            coco_list.append(image)
+        else:
+            break
+    batch = []
+    coco_embedding_list = []
+    for index, row in enumerate(coco_list):
+        if (len(batch) < 128):
+            batch.append(Image.open(coco_list[index]).convert("RGB"))
+        else:
+            with torch.no_grad():
+                inputs = processor(images=batch, return_tensors="pt").to(device)
+                outputs = model(**inputs)
+            #Convert the tensor to a numpy array for storage 
+            embeddings = outputs.pooler_output.detach().cpu().numpy()
+            coco_embedding_list.append(embeddings)
+            batch.clear()
+    if (len(batch) > 0):
+        with torch.no_grad():
+            inputs = processor(images=batch, return_tensors="pt").to(device)
+            outputs = model(**inputs)
+        #Convert the tensor to a numpy array for storage 
+        embeddings = outputs.pooler_output.detach().cpu().numpy()
+        coco_embedding_list.append(embeddings)
+        batch.clear()
+    #Save the embeddings for temporary use
+    coco_matrix = np.concatenate(coco_embedding_list, axis = 0)
+
+    #ended up not using CIFAKE from Kaggle due to how small the images were, concerns on comparison to other datasets
+    #instead combined natural images from https://www.kaggle.com/datasets/prasunroy/natural-images for real images, and 
+    #https://www.kaggle.com/datasets/gpch2159/ai-vs-human-syn-imgs-v2-partial/data
+    #for ai generated images using stable Diffusion XL
+
+    natural_images = Path(r"C:\Users\zacha\projects\CIS430\Videre\core\natural_images\test_images").glob('*.jpg')
+    natural_image_list = []
+    for index, image in enumerate(natural_images):
+        if(index < 500):
+            natural_image_list.append(image)
+        else:
+            break
+    batch = []
+    embeddings_natural_list = []
+    for index, row in enumerate(natural_image_list):
+        if (len(batch) < 128):
+            batch.append(Image.open(natural_image_list[index]).convert("RGB"))
+        else:
+            with torch.no_grad():
+                inputs = processor(images=batch, return_tensors="pt").to(device)
+                outputs = model(**inputs)
+            #Convert the tensor to a numpy array for storage 
+            embeddings = outputs.pooler_output.detach().cpu().numpy()
+            embeddings_natural_list.append(embeddings)
+            batch.clear()
+    if (len(batch) > 0):
+        with torch.no_grad():
+            inputs = processor(images=batch, return_tensors="pt").to(device)
+            outputs = model(**inputs)
+        #Convert the tensor to a numpy array for storage 
+        embeddings = outputs.pooler_output.detach().cpu().numpy()
+        embeddings_natural_list.append(embeddings)
+        batch.clear()
+    #Save the embeddings for temporary use
+    natural_matrix = np.concatenate(embeddings_natural_list, axis = 0)
+
+    ai_images = Path(r"C:\Users\zacha\projects\CIS430\Videre\core\stabilityai.stable-diffusion-xl-refiner-1.0_0.5_12_2025.02.25_05.15.08_846327").glob('*.jpg')
+    ai_image_list = []
+    for index, image in enumerate(islice(ai_images, 1000, 1500)):
+        if(index < 500):
+            ai_image_list.append(image)
+        else:
+            break
+    batch = []
+    embeddings_ai_list = []
+    for index, row in enumerate(ai_image_list):
+        if (len(batch) < 128):
+            batch.append(Image.open(ai_image_list[index]).convert("RGB"))
+        else:
+            with torch.no_grad():
+                inputs = processor(images=batch, return_tensors="pt").to(device)
+                outputs = model(**inputs)
+            #Convert the tensor to a numpy array for storage 
+            embeddings = outputs.pooler_output.detach().cpu().numpy()
+            embeddings_ai_list.append(embeddings)
+            batch.clear()
+    if (len(batch) > 0):
+        with torch.no_grad():
+            inputs = processor(images=batch, return_tensors="pt").to(device)
+            outputs = model(**inputs)
+        #Convert the tensor to a numpy array for storage 
+        embeddings = outputs.pooler_output.detach().cpu().numpy()
+        embeddings_ai_list.append(embeddings)
+        batch.clear()
+    #Save the embeddings for temporary use
+    ai_matrix = np.concatenate(embeddings_ai_list, axis = 0)
+
+    #create corresponding label arrays for each matrix 
+    #then concatenate them into one label matrix that will correspond to the collapsed 
+    midjourney_labels = [1] * 500
+    coco_labels =  [0] * 497
+    natural_image_labels = [0] * 497
+    stable_diff_labels = [1] * 497
+
+    label_matrix = np.concatenate((midjourney_labels, coco_labels, natural_image_labels, stable_diff_labels), axis = 0)
+
+    #Create the corresponding embeddings matrix to train the model 
+    training_embedding_matrix = np.concatenate((midjourney_matrix, coco_matrix, natural_matrix, ai_matrix), axis = 0)
+
+    clf = joblib.load("final_classifier.joblib")
+
+    predicted_results = clf.predict(training_embedding_matrix)
+
+    print(classification_report(label_matrix, predicted_results))
+    print(confusion_matrix(label_matrix, predicted_results))
+    print(roc_auc_score(label_matrix, clf.predict_proba(training_embedding_matrix)[:, 1]))
+    plot = RocCurveDisplay.from_predictions(label_matrix, clf.predict_proba(training_embedding_matrix)[:, 1], plot_chance_level = True)
+    _ = plot.ax_.set(xlabel="False Positive Rate", ylabel="True Positive Rate",
+    title="AI vs Real Image Detection\nReceiver Operating Characteristic",
+)
+    plt.show()
 #Helper function to load in model 
 def __load_model():
     #Loading Pretrained/Frozen embedders
@@ -193,3 +342,5 @@ def convert_input_image(input):
     #Convert the tensor to a numpy array for storage 
     embeddings = outputs.pooler_output.detach().cpu().numpy()
     return embeddings
+
+test_classifier()
