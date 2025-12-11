@@ -13,6 +13,7 @@ import joblib
 from itertools import islice
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve, RocCurveDisplay
 import matplotlib.pyplot as plt
+from io import BytesIO
 
 #Loading Pretrained/Frozen embedders
 model = SiglipVisionModel.from_pretrained("google/siglip-base-patch16-224")
@@ -301,16 +302,17 @@ def test_classifier():
 
     label_matrix = np.concatenate((midjourney_labels, coco_labels, natural_image_labels, stable_diff_labels), axis = 0)
 
-    #Create the corresponding embeddings matrix to train the model 
+    #Create the corresponding embeddings matrix to test the model 
     training_embedding_matrix = np.concatenate((midjourney_matrix, coco_matrix, natural_matrix, ai_matrix), axis = 0)
 
     clf = joblib.load("final_classifier.joblib")
 
     predicted_results = clf.predict(training_embedding_matrix)
 
+    #Calculate relevant metrics and graph for the classifier
     print(classification_report(label_matrix, predicted_results))
     print(confusion_matrix(label_matrix, predicted_results))
-    print(roc_auc_score(label_matrix, clf.predict_proba(training_embedding_matrix)[:, 1]))
+    print("Reciever Operating Characteristic Area Under the Curve Score", roc_auc_score(label_matrix, clf.predict_proba(training_embedding_matrix)[:, 1]))
     plot = RocCurveDisplay.from_predictions(label_matrix, clf.predict_proba(training_embedding_matrix)[:, 1], plot_chance_level = True)
     _ = plot.ax_.set(xlabel="False Positive Rate", ylabel="True Positive Rate",
     title="AI vs Real Image Detection\nReceiver Operating Characteristic",
@@ -332,8 +334,9 @@ def convert_input_image(input):
     #Load in embedder
     model, processor = __load_model()
 
-    #Open image
-    image = Image.open(input)
+    #Convert incoming image bytes to image and Open image
+    bytes_to_image = BytesIO(input)
+    image = Image.open(bytes_to_image)
     #Disables gradient calculation as we are only embedding vectors, no need for model training
     with torch.no_grad():
         inputs = processor(images=image, return_tensors="pt").to(device)
@@ -343,4 +346,17 @@ def convert_input_image(input):
     embeddings = outputs.pooler_output.detach().cpu().numpy()
     return embeddings
 
-test_classifier()
+#Function for Full stack application to predict image 
+def predict_image(input):
+    #Convert image to embeddings
+    embeddings = convert_input_image(input)
+
+    #Load classifer and predict the image's class and the probabilities of it
+    clf = joblib.load("final_classifier.joblib")
+    predicted_class = clf.predict(embeddings)
+    prob_real, prob_fake = clf.predict_proba(embeddings)[0]
+    
+    #Create a JSON payload for the API to return, and return the predicted values, typecasting them to regular floats instead of numpy floats
+    results_payload = {"class": int(predicted_class[0]), "probability_real": float(prob_real), "probability_ai": float(prob_fake)}
+    return results_payload
+#test_classifier()

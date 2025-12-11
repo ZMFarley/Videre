@@ -5,3 +5,4 @@ natural_images/
 stabilityai.stable-diffusion-xl-refiner-1.0_0.5_12_2025.02.25_05.15.08_846327/
 temp.txt
 demo-test-image.jpg
+__pycache__

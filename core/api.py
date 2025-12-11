@@ -1,8 +1,10 @@
 # IMPORT SECTION
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from embedding import convert_input_image
+from embedding import predict_image
+from io import BytesIO
+from PIL import Image
 app = FastAPI()
 
 # ACCEPTABLE ORIGINS
@@ -16,6 +18,8 @@ app.add_middleware(
     allow_headers=["*"]
 )
 # UPDATES NORMAL TRAFFIC SECTION OF THE DASHBOARD 
-@app.post("/upload-image")
-async def upload_image():
-    print(convert_input_image)
+@app.post("/predict")
+async def predict_image_class(file: UploadFile = File(...)):
+    input = await file.read()
+    return predict_image(input)
+    
