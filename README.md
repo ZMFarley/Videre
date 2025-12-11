@@ -18,7 +18,16 @@ From there, operation is straight forwards, through the buttons offered on the a
 
 Currently both testing and training modules create the additionally stored npy files, these files hold the relevant embedding matrices created by SigLIP. They are stored and generatable here and in the github, for later reuse.
 
-The testing module runs tests on ~2000 images, taken from the same datasets as those used for training, but sliced specifically to avoid reuse and thus errors. All relevant metrics are printable, alongside graphs for better analysis of the program's performance
+The training module runs on ~4000 images, sourced from the following websites: 
+https://huggingface.co/datasets/ideepankarsharma2003/AIGeneratedImages_Midjourney for Midjourney generated AI images (1000 images using training split)
+https://cocodataset.org/#download using the Val2017 data set of real images (1000 images)
+https://www.kaggle.com/datasets/prasunroy/natural-images for real images (comprised of 8 classes each, of which 125 were taken to reach the 1000 images needed), and 
+https://www.kaggle.com/datasets/gpch2159/ai-vs-human-syn-imgs-v2-partial/data for ai generated images using stable Diffusion XL
+
+https://cocodataset.org/#download ~1000 images, using 
+The testing module runs tests on ~2000 images, taken from the same datasets as those used for training (save for Midjourney, which uses the provided testing split), but sliced specifically to avoid reuse and thus errors. All relevant metrics are printable, alongside graphs for better analysis of the program's performance.
+
+In the testing module, around 500 images from each of the 4 data sets were taken, with the only outlier being for the natural image data set, which given its 8 classes, had around 63 images taken per class to reach that requirement.
 
 # Work Flow Diagram
 Attached is the current workflow of the program, which is intended to grow and change as the project progresses
