@@ -18,6 +18,8 @@ From there, operation is straight forwards, through the buttons offered on the a
 
 Currently both testing and training modules create the additionally stored npy files, these files hold the relevant embedding matrices created by SigLIP. They are stored and generatable here and in the github, for later reuse.
 
+Alongside that, the datasets must be set downloaded or set up accordingly to the aforementioned slicing. Otherwise, ensure that the embedding functions are ignored via comments, and directly load the npy files and run them for training and prediction using the classifiers.
+
 # Dataset Information
 The training module runs on ~4000 images, sourced from the following websites: 
 - https://huggingface.co/datasets/ideepankarsharma2003/AIGeneratedImages_Midjourney for Midjourney generated AI images (1000 images using training split)
