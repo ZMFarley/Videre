@@ -183,7 +183,20 @@ def create_embeddings_and_classifier():
 
     clf.fit(training_embedding_matrix, label_matrix)
 
-    joblib.dump(clf, "test_classifier.joblib")
+    #joblib.dump(clf, "test_classifier.joblib")
+
+    predicted_results = clf.predict(training_embedding_matrix)
+
+    #Calculate relevant metrics and graph for the classifier
+    print(classification_report(label_matrix, predicted_results))
+    print(confusion_matrix(label_matrix, predicted_results))
+    print("Reciever Operating Characteristic Area Under the Curve Score", roc_auc_score(label_matrix, clf.predict_proba(training_embedding_matrix)[:, 1]))
+    plot = RocCurveDisplay.from_predictions(label_matrix, clf.predict_proba(training_embedding_matrix)[:, 1], plot_chance_level = True)
+    _ = plot.ax_.set(xlabel="False Positive Rate", ylabel="True Positive Rate",
+    title="Trainning AI vs Real Image Detection\nReceiver Operating Characteristic",
+    )
+    plt.show()
+
 
 #Function to begin the testing of the classifer and to produce relevant metrics pertineant to the project
 def test_classifier():
@@ -349,7 +362,7 @@ def test_classifier():
     plot = RocCurveDisplay.from_predictions(label_matrix, clf.predict_proba(training_embedding_matrix)[:, 1], plot_chance_level = True)
     _ = plot.ax_.set(xlabel="False Positive Rate", ylabel="True Positive Rate",
     title="AI vs Real Image Detection\nReceiver Operating Characteristic",
-)
+    )
     plt.show()
 #Helper function to load in model 
 def __load_model():
@@ -392,3 +405,4 @@ def predict_image(input):
     #Create a JSON payload for the API to return, and return the predicted values, typecasting them to regular floats instead of numpy floats
     results_payload = {"class": int(predicted_class[0]), "probability_real": float(prob_real), "probability_ai": float(prob_fake)}
     return results_payload
+
