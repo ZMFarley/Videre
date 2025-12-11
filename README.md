@@ -23,7 +23,7 @@ The testing module runs tests on ~2000 images, taken from the same datasets as t
 # Work Flow Diagram
 Attached is the current workflow of the program, which is intended to grow and change as the project progresses
 
-![Workflow Diagram](./Videre/workflow.png)
+![Workflow Diagram](workflow.png)
 
 # Future Plans 
 This project is under development, and many different additions will soon take place.
