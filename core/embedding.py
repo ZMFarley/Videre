@@ -194,6 +194,7 @@ def test_classifier():
             batch.clear()
     #Save the embeddings for temporary use
     midjourney_matrix = np.concatenate(midjourney_list, axis = 0)
+    np.save("test_midjourney_embeddings", midjourney_matrix)
 
     coco_images = Path(r"C:\Users\zacha\projects\CIS430\Videre\core\val2017").glob('*.jpg')
     coco_list = []
@@ -225,11 +226,7 @@ def test_classifier():
         batch.clear()
     #Save the embeddings for temporary use
     coco_matrix = np.concatenate(coco_embedding_list, axis = 0)
-
-    #ended up not using CIFAKE from Kaggle due to how small the images were, concerns on comparison to other datasets
-    #instead combined natural images from https://www.kaggle.com/datasets/prasunroy/natural-images for real images, and 
-    #https://www.kaggle.com/datasets/gpch2159/ai-vs-human-syn-imgs-v2-partial/data
-    #for ai generated images using stable Diffusion XL
+    np.save("test_coco_embeddings", coco_matrix)
 
     natural_images = Path(r"C:\Users\zacha\projects\CIS430\Videre\core\natural_images\test_images").glob('*.jpg')
     natural_image_list = []
@@ -261,6 +258,7 @@ def test_classifier():
         batch.clear()
     #Save the embeddings for temporary use
     natural_matrix = np.concatenate(embeddings_natural_list, axis = 0)
+    np.save("test_natural_embeddings", natural_matrix)
 
     ai_images = Path(r"C:\Users\zacha\projects\CIS430\Videre\core\stabilityai.stable-diffusion-xl-refiner-1.0_0.5_12_2025.02.25_05.15.08_846327").glob('*.jpg')
     ai_image_list = []
@@ -292,6 +290,7 @@ def test_classifier():
         batch.clear()
     #Save the embeddings for temporary use
     ai_matrix = np.concatenate(embeddings_ai_list, axis = 0)
+    np.save("test_ai_embeddings", ai_matrix)
 
     #create corresponding label arrays for each matrix 
     #then concatenate them into one label matrix that will correspond to the collapsed 
@@ -359,4 +358,4 @@ def predict_image(input):
     #Create a JSON payload for the API to return, and return the predicted values, typecasting them to regular floats instead of numpy floats
     results_payload = {"class": int(predicted_class[0]), "probability_real": float(prob_real), "probability_ai": float(prob_fake)}
     return results_payload
-#test_classifier()
+test_classifier()
