@@ -15,156 +15,44 @@ from sklearn.metrics import classification_report, confusion_matrix, roc_auc_sco
 import matplotlib.pyplot as plt
 from io import BytesIO
 
-#Loading Pretrained/Frozen embedders
-model = SiglipVisionModel.from_pretrained("google/siglip-base-patch16-224")
-processor = AutoImageProcessor.from_pretrained("google/siglip-base-patch16-224", use_fast = True)
+#Class to hold embedding model, and relevant helper functions
+class Embedder: 
+    def __init__(self):
+        self.model, self.processor, self.device = self.__load_model()
+    #Helper function to load in model 
+    def __load_model(self):
+        #Loading Pretrained/Frozen embedders
+        model = SiglipVisionModel.from_pretrained("google/siglip-base-patch16-224")
+        processor = AutoImageProcessor.from_pretrained("google/siglip-base-patch16-224", use_fast = True)
 
-#Load in Relevant GPU or CPU to run model
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-model.to(device)
+        #Load in Relevant GPU or CPU to run model
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        model.to(device)
+        return model, processor, device 
+    
+    def _embed(self, batch):
+    #Convert images into embeddings
+        with torch.no_grad():
+            inputs = self.processor(images=batch, return_tensors="pt").to(self.device)
+            outputs = self.model(**inputs)
+            #Convert the tensor to a numpy array for storage 
+            embeddings = outputs.pooler_output.detach().cpu().numpy()
+            return embeddings
 
 def create_embeddings_and_classifier():
-    #load in relevant datasets
-    #This is the saved code used to load in my corresponding datasets. They were frozen in comments for later refactoring while i 
-    #Began iterating the progress on my overarching project 
+    #load in relevant datasets and embedder
+    embedder = Embedder()
     #Obtained from https://huggingface.co/datasets/ideepankarsharma2003/AIGeneratedImages_Midjourney
-    midjourney_ai_images = load_dataset("ideepankarsharma2003/AIGeneratedImages_Midjourney", split ="train", streaming = True)
-    midjourney_list = []
-    batch = []
+    midjourney_matrix = embed_huggingface_datasets(embedder, "ideepankarsharma2003/AIGeneratedImages_Midjourney", "train", "embeddings_midjourney", 1000, 128)
 
-    #Batch images into 128 groups up until the last index
-    for index, row in enumerate(midjourney_ai_images):
-        if (len(batch) < 128 and index != 1000):
-            batch.append(row["image"])
-        if (index == 1000):
-            break
-        else:
-            #Convert images into embeddings
-            with torch.no_grad():
-                inputs = processor(images=batch, return_tensors="pt").to(device)
-                outputs = model(**inputs)
-            #Convert the tensor to a numpy array for storage 
-            embeddings = outputs.pooler_output.detach().cpu().numpy()
-            midjourney_list.append(embeddings)
-            batch.clear()
-    #Save the embeddings for temporary use
-    midjourney_matrix = np.concatenate(midjourney_list, axis = 0)
-    np.save("embeddings_midjourney", midjourney_matrix)
+    #Images here were obtained from the COCO datast, val2017, using the first 1000 images
+    coco_matrix = embed_locally_saved_datasets(embedder, r"C:\Users\zacha\projects\CIS430\Videre\core\val2017", "embeddings_coco", 1000, 128, 0, 1000)
 
-    #Pull images from local path (Requires adjustment for given users machine) and store them locally 
-    coco_images = Path(r"C:\Users\zacha\projects\CIS430\Videre\core\val2017").glob('*.jpg')
-    coco_list = []
-    #grab first 1000 images
-    for index, image in enumerate(coco_images):
-        if(index < 1000):
-            coco_list.append(image)
-        else:
-            break
-    batch = []
-    coco_embedding_list = []
-    #Batch images into 128 groups up until the last index
-    for index, row in enumerate(coco_list):
-        if (len(batch) < 128):
-            batch.append(Image.open(coco_list[index]).convert("RGB"))
-        else:
-            #Convert to vector embeddings
-            with torch.no_grad():
-                inputs = processor(images=batch, return_tensors="pt").to(device)
-                outputs = model(**inputs)
-            #Convert the tensor to a numpy array for storage 
-            embeddings = outputs.pooler_output.detach().cpu().numpy()
-            coco_embedding_list.append(embeddings)
-            batch.clear()
-    #Embed remaining images
-    if (len(batch) > 0):
-        with torch.no_grad():
-            inputs = processor(images=batch, return_tensors="pt").to(device)
-            outputs = model(**inputs)
-        #Convert the tensor to a numpy array for storage 
-        embeddings = outputs.pooler_output.detach().cpu().numpy()
-        coco_embedding_list.append(embeddings)
-        batch.clear()
-    #Save the embeddings for temporary use
-    coco_matrix = np.concatenate(coco_embedding_list, axis = 0)
-    np.save("embeddings_coco", coco_matrix)
-
-    #ended up not using CIFAKE from Kaggle due to how small the images were, concerns on comparison to other datasets
-    #instead combined natural images from https://www.kaggle.com/datasets/prasunroy/natural-images for real images, and 
+    #natural images from https://www.kaggle.com/datasets/prasunroy/natural-images for real images, and 
     #https://www.kaggle.com/datasets/gpch2159/ai-vs-human-syn-imgs-v2-partial/data
     #for ai generated images using stable Diffusion XL
-
-    #Pull images from local path (Requires adjustment for given users machine) and store them locally 
-    natural_images = Path(r"C:\Users\zacha\projects\CIS430\Videre\core\natural_images\embedding_images").glob('*.jpg')
-    natural_image_list = []
-    for index, image in enumerate(natural_images):
-        if(index < 1000):
-            natural_image_list.append(image)
-        else:
-            break
-    batch = []
-    embeddings_natural_list = []
-    for index, row in enumerate(natural_image_list):
-        #batch images into groups of 128
-        if (len(batch) < 128):
-            batch.append(Image.open(natural_image_list[index]).convert("RGB"))
-        else:
-            #embed images
-            with torch.no_grad():
-                inputs = processor(images=batch, return_tensors="pt").to(device)
-                outputs = model(**inputs)
-            #Convert the tensor to a numpy array for storage 
-            embeddings = outputs.pooler_output.detach().cpu().numpy()
-            embeddings_natural_list.append(embeddings)
-            batch.clear()
-    #embed remaining images
-    if (len(batch) > 0):
-        with torch.no_grad():
-            inputs = processor(images=batch, return_tensors="pt").to(device)
-            outputs = model(**inputs)
-        #Convert the tensor to a numpy array for storage 
-        embeddings = outputs.pooler_output.detach().cpu().numpy()
-        embeddings_natural_list.append(embeddings)
-        batch.clear()
-    #Save the embeddings for temporary use
-    natural_matrix = np.concatenate(embeddings_natural_list, axis = 0)
-    np.save("embeddings_natural_images", natural_matrix)
-
-    #Pull images from local path (Requires adjustment for given users machine) and store them locally 
-    ai_images = Path(r"C:\Users\zacha\projects\CIS430\Videre\core\stabilityai.stable-diffusion-xl-refiner-1.0_0.5_12_2025.02.25_05.15.08_846327").glob('*.jpg')
-    ai_image_list = []
-    for index, image in enumerate(ai_images):
-        #grab 1000 images for embedding
-        if(index < 1000):
-            ai_image_list.append(image)
-        else:
-            break
-    batch = []
-    embeddings_ai_list = []
-    for index, row in enumerate(ai_image_list):
-        #batch images into groups of 128 for embedding
-        if (len(batch) < 128):
-            batch.append(Image.open(ai_image_list[index]).convert("RGB"))
-        else:
-            #embed the images
-            with torch.no_grad():
-                inputs = processor(images=batch, return_tensors="pt").to(device)
-                outputs = model(**inputs)
-            #Convert the tensor to a numpy array for storage 
-            embeddings = outputs.pooler_output.detach().cpu().numpy()
-            embeddings_ai_list.append(embeddings)
-            batch.clear()
-        #embed remaining images
-    if (len(batch) > 0):
-        with torch.no_grad():
-            inputs = processor(images=batch, return_tensors="pt").to(device)
-            outputs = model(**inputs)
-        #Convert the tensor to a numpy array for storage 
-        embeddings = outputs.pooler_output.detach().cpu().numpy()
-        embeddings_ai_list.append(embeddings)
-        batch.clear()
-    #Save the embeddings for temporary use
-    ai_matrix = np.concatenate(embeddings_ai_list, axis = 0)
-    np.save("embeddings_stableDiffXL", ai_matrix)
+    natural_matrix = embed_locally_saved_datasets(embedder, r"C:\Users\zacha\projects\CIS430\Videre\core\natural_images\embedding_images", "embeddings_natural_images", 1000, 128, 0, 1000)
+    ai_matrix = embed_locally_saved_datasets(embedder, r"C:\Users\zacha\projects\CIS430\Videre\core\stabilityai.stable-diffusion-xl-refiner-1.0_0.5_12_2025.02.25_05.15.08_846327", "embeddings_stableDiffXL", 1000, 128, 0, 1000)
 
     #create corresponding label arrays for each matrix 
     #then concatenate them into one label matrix that will correspond to the collapsed 
@@ -187,6 +75,11 @@ def create_embeddings_and_classifier():
 
     predicted_results = clf.predict(training_embedding_matrix)
 
+    #Output metrics of predictions
+    __output_metrics(clf, training_embedding_matrix, label_matrix, predicted_results)
+
+#Calculate relevant metrics and graphs for classifier performance
+def __output_metrics(clf, training_embedding_matrix, label_matrix, predicted_results):
     #Calculate relevant metrics and graph for the classifier
     print(classification_report(label_matrix, predicted_results))
     print(confusion_matrix(label_matrix, predicted_results))
@@ -195,146 +88,25 @@ def create_embeddings_and_classifier():
     _ = plot.ax_.set(xlabel="False Positive Rate", ylabel="True Positive Rate",
     title="Trainning AI vs Real Image Detection\nReceiver Operating Characteristic",
     )
-    plt.show()
+    plt.show()  
 
 
 #Function to begin the testing of the classifer and to produce relevant metrics pertineant to the project
 def test_classifier():
-    #load in relevant datasets
-    #This is the saved code used to load in my corresponding datasets. They were frozen in comments for later refactoring while i 
-    #Began iterating the progress on my overarching project 
+    #load in relevant datasets and embedder
+    embedder = Embedder() 
     #Obtained from https://huggingface.co/datasets/ideepankarsharma2003/AIGeneratedImages_Midjourney
-    midjourney_ai_images = load_dataset("ideepankarsharma2003/AIGeneratedImages_Midjourney", split ="test", streaming = True)
-    midjourney_list = []
-    batch = []
-    #grab first 500 images for testing
-    for index, row in enumerate(midjourney_ai_images):
-        if (len(batch) < 128 and index != 500):
-            batch.append(row["image"])
-        if (index == 500):
-            break
-        else:
-            #embed images
-            with torch.no_grad():
-                inputs = processor(images=batch, return_tensors="pt").to(device)
-                outputs = model(**inputs)
-            #Convert the tensor to a numpy array for storage 
-            embeddings = outputs.pooler_output.detach().cpu().numpy()
-            midjourney_list.append(embeddings)
-            batch.clear()
-    #Save the embeddings for temporary use
-    midjourney_matrix = np.concatenate(midjourney_list, axis = 0)
-    np.save("test_midjourney_embeddings", midjourney_matrix)
+    #Obtained from https://huggingface.co/datasets/ideepankarsharma2003/AIGeneratedImages_Midjourney
+    midjourney_matrix = embed_huggingface_datasets(embedder, "ideepankarsharma2003/AIGeneratedImages_Midjourney", "test", "test_embeddings_midjourney", 500, 128)
 
-    #Pull images from local path (Requires adjustment for given users machine) and store them locally 
-    coco_images = Path(r"C:\Users\zacha\projects\CIS430\Videre\core\val2017").glob('*.jpg')
-    coco_list = []
-    #grab first 500 images after training data set of 1000
-    for index, image in enumerate(islice(coco_images, 1000, 1500)):
-        if(index < 500):
-            coco_list.append(image)
-        else:
-            break
-    batch = []
-    coco_embedding_list = []
-    for index, row in enumerate(coco_list):
-        #batch images into groups of 128 for embedding
-        if (len(batch) < 128):
-            batch.append(Image.open(coco_list[index]).convert("RGB"))
-        else:
-            #embed images
-            with torch.no_grad():
-                inputs = processor(images=batch, return_tensors="pt").to(device)
-                outputs = model(**inputs)
-            #Convert the tensor to a numpy array for storage 
-            embeddings = outputs.pooler_output.detach().cpu().numpy()
-            coco_embedding_list.append(embeddings)
-            batch.clear()
-    #embed remaining images
-    if (len(batch) > 0):
-        with torch.no_grad():
-            inputs = processor(images=batch, return_tensors="pt").to(device)
-            outputs = model(**inputs)
-        #Convert the tensor to a numpy array for storage 
-        embeddings = outputs.pooler_output.detach().cpu().numpy()
-        coco_embedding_list.append(embeddings)
-        batch.clear()
-    #Save the embeddings for temporary use
-    coco_matrix = np.concatenate(coco_embedding_list, axis = 0)
-    np.save("test_coco_embeddings", coco_matrix)
+    #Images here were obtained from the COCO datast, val2017, using the first 1000 images
+    coco_matrix = embed_locally_saved_datasets(embedder, r"C:\Users\zacha\projects\CIS430\Videre\core\val2017", "test_coco_embeddings", 500, 128, 1000, 1500)
 
-    #Pull images from local path (Requires adjustment for given users machine) and store them locally 
-    natural_images = Path(r"C:\Users\zacha\projects\CIS430\Videre\core\natural_images\test_images").glob('*.jpg')
-    natural_image_list = []
-    #grab 500 images for testing
-    for index, image in enumerate(natural_images):
-        if(index < 500):
-            natural_image_list.append(image)
-        else:
-            break
-    batch = []
-    embeddings_natural_list = []
-    for index, row in enumerate(natural_image_list):
-        #batch images into groups of 128
-        if (len(batch) < 128):
-            batch.append(Image.open(natural_image_list[index]).convert("RGB"))
-        else:
-            #embed images
-            with torch.no_grad():
-                inputs = processor(images=batch, return_tensors="pt").to(device)
-                outputs = model(**inputs)
-            #Convert the tensor to a numpy array for storage 
-            embeddings = outputs.pooler_output.detach().cpu().numpy()
-            embeddings_natural_list.append(embeddings)
-            batch.clear()
-    #Embed remaining images
-    if (len(batch) > 0):
-        with torch.no_grad():
-            inputs = processor(images=batch, return_tensors="pt").to(device)
-            outputs = model(**inputs)
-        #Convert the tensor to a numpy array for storage 
-        embeddings = outputs.pooler_output.detach().cpu().numpy()
-        embeddings_natural_list.append(embeddings)
-        batch.clear()
-    #Save the embeddings for temporary use
-    natural_matrix = np.concatenate(embeddings_natural_list, axis = 0)
-    np.save("test_natural_embeddings", natural_matrix)
-
-    #Pull images from local path (Requires adjustment for given users machine) and store them locally 
-    ai_images = Path(r"C:\Users\zacha\projects\CIS430\Videre\core\stabilityai.stable-diffusion-xl-refiner-1.0_0.5_12_2025.02.25_05.15.08_846327").glob('*.jpg')
-    ai_image_list = []
-    #Grab first 500 images after the original training data set
-    for index, image in enumerate(islice(ai_images, 1000, 1500)):
-        if(index < 500):
-            ai_image_list.append(image)
-        else:
-            break
-    batch = []
-    embeddings_ai_list = []
-    #batch images into groups of 128 and embed them 
-    for index, row in enumerate(ai_image_list):
-        if (len(batch) < 128):
-            batch.append(Image.open(ai_image_list[index]).convert("RGB"))
-        else:
-            with torch.no_grad():
-                inputs = processor(images=batch, return_tensors="pt").to(device)
-                outputs = model(**inputs)
-            #Convert the tensor to a numpy array for storage 
-            embeddings = outputs.pooler_output.detach().cpu().numpy()
-            embeddings_ai_list.append(embeddings)
-            batch.clear()
-    #Embed remaining images
-    if (len(batch) > 0):
-        with torch.no_grad():
-            inputs = processor(images=batch, return_tensors="pt").to(device)
-            outputs = model(**inputs)
-        #Convert the tensor to a numpy array for storage 
-        embeddings = outputs.pooler_output.detach().cpu().numpy()
-        embeddings_ai_list.append(embeddings)
-        batch.clear()
-    #Save the embeddings for temporary use
-    ai_matrix = np.concatenate(embeddings_ai_list, axis = 0)
-    np.save("test_ai_embeddings", ai_matrix)
+    #natural images from https://www.kaggle.com/datasets/prasunroy/natural-images for real images, and 
+    #https://www.kaggle.com/datasets/gpch2159/ai-vs-human-syn-imgs-v2-partial/data
+    #for ai generated images using stable Diffusion XL
+    natural_matrix = embed_locally_saved_datasets(embedder, r"C:\Users\zacha\projects\CIS430\Videre\core\natural_images\embedding_images", "test_natural_embeddings", 500, 128, 0, 500)
+    ai_matrix = embed_locally_saved_datasets(embedder, r"C:\Users\zacha\projects\CIS430\Videre\core\stabilityai.stable-diffusion-xl-refiner-1.0_0.5_12_2025.02.25_05.15.08_846327", "test_ai_embeddings", 500, 128, 1000, 1500)
 
     #create corresponding label arrays for each matrix 
     #then concatenate them into one label matrix that will correspond to the collapsed 
@@ -355,42 +127,65 @@ def test_classifier():
     #Predict results of test data
     predicted_results = clf.predict(training_embedding_matrix)
 
-    #Calculate relevant metrics and graph for the classifier
-    print(classification_report(label_matrix, predicted_results))
-    print(confusion_matrix(label_matrix, predicted_results))
-    print("Reciever Operating Characteristic Area Under the Curve Score", roc_auc_score(label_matrix, clf.predict_proba(training_embedding_matrix)[:, 1]))
-    plot = RocCurveDisplay.from_predictions(label_matrix, clf.predict_proba(training_embedding_matrix)[:, 1], plot_chance_level = True)
-    _ = plot.ax_.set(xlabel="False Positive Rate", ylabel="True Positive Rate",
-    title="AI vs Real Image Detection\nReceiver Operating Characteristic",
-    )
-    plt.show()
-#Helper function to load in model 
-def __load_model():
-    #Loading Pretrained/Frozen embedders
-    model = SiglipVisionModel.from_pretrained("google/siglip-base-patch16-224")
-    processor = AutoImageProcessor.from_pretrained("google/siglip-base-patch16-224", use_fast = True)
+    #Output metrics of predictions
+    __output_metrics(clf, training_embedding_matrix, label_matrix, predicted_results)
 
-    #Load in Relevant GPU or CPU to run model
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model.to(device)
-    return model, processor
+def embed_huggingface_datasets(embedder, dataset, training_split, save_file_name, num_images, batch_size):
+    images_list = load_dataset(dataset, split = training_split, streaming = True)
+    embedding_list = []
+    batch = []
+
+    #Batch images into specificed length groups up until the last index
+    for index, row in enumerate(images_list):
+        if (len(batch) < batch_size and index != num_images):
+            batch.append(row["image"])
+        if (index == num_images):
+            break
+        else:
+            embedding_list.append(embedder._embed(batch))
+            batch.clear()
+    #Save the embeddings for temporary use
+    embedding_matrix = np.concatenate(embedding_list, axis = 0)
+    np.save(save_file_name, embedding_matrix)
+    return embedding_matrix 
+
+def embed_locally_saved_datasets(embedder, dataset_path, save_file_name, num_images, batch_size, index_start, index_end):
+    #Pull images from local path (Requires adjustment for given users machine) and store them locally 
+    images = Path(dataset_path).glob('*.jpg')
+    images_list = []
+    batch = []
+    embedding_list = []
+    #grab first 500 images after training data set of 1000
+    for index, image in enumerate(islice(images, index_start, index_end)):
+        if(index < num_images):
+            images_list.append(image)
+        else:
+            break
+    for index, row in enumerate(images_list):
+        #batch images into groups of 128 for embedding
+        if (len(batch) < batch_size):
+            batch.append(Image.open(images_list[index]).convert("RGB"))
+        else:
+            #embed images
+            embedding_list.append(embedder._embed(batch))
+            batch.clear()
+    if (len(batch) > 0):
+        embedding_list.append(embedder._embed(batch))
+        batch.clear()
+    #Save the embeddings for temporary use
+    embedding_matrix = np.concatenate(embedding_list, axis = 0)
+    np.save(save_file_name, embedding_matrix)
+    return embedding_matrix
 
 #Function to convert user's inputted image
 def convert_input_image(input):
-    #Load in embedder
-    model, processor = __load_model()
-
+    #Instiate embedding object to load relevant models
+    embedder = Embedder()
     #Convert incoming image bytes to image and Open image
     bytes_to_image = BytesIO(input)
-    image = Image.open(bytes_to_image)
-    #Disables gradient calculation as we are only embedding vectors, no need for model training
-    with torch.no_grad():
-        inputs = processor(images=image, return_tensors="pt").to(device)
-        outputs = model(**inputs)
-
-    #Convert the tensor to a numpy array for storage 
-    embeddings = outputs.pooler_output.detach().cpu().numpy()
-    return embeddings
+    image = [Image.open(bytes_to_image)]
+    embedding = embedder._embed(image)
+    return embedding
 
 #Function for Full stack application to predict image 
 def predict_image(input):
@@ -405,4 +200,3 @@ def predict_image(input):
     #Create a JSON payload for the API to return, and return the predicted values, typecasting them to regular floats instead of numpy floats
     results_payload = {"class": int(predicted_class[0]), "probability_real": float(prob_real), "probability_ai": float(prob_fake)}
     return results_payload
-
