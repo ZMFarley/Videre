@@ -199,5 +199,3 @@ def predict_image(input: bytes) -> dict:
     #Create a JSON payload for the API to return, and return the predicted values, typecasting them to regular floats instead of numpy floats
     results_payload = {"class": int(predicted_class[0]), "probability_real": float(prob_real), "probability_ai": float(prob_fake)}
     return results_payload
-
-test_classifier()
