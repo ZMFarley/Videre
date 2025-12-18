@@ -17,10 +17,11 @@ from io import BytesIO
 
 #Class to hold embedding model, and relevant helper functions
 class Embedder: 
-    def __init__(self):
+    def __init__(self) -> None:
         self.model, self.processor, self.device = self.__load_model()
+
     #Helper function to load in model 
-    def __load_model(self):
+    def __load_model(self) -> None:
         #Loading Pretrained/Frozen embedders
         model = SiglipVisionModel.from_pretrained("google/siglip-base-patch16-224")
         processor = AutoImageProcessor.from_pretrained("google/siglip-base-patch16-224", use_fast = True)
@@ -30,7 +31,7 @@ class Embedder:
         model.to(device)
         return model, processor, device 
     
-    def _embed(self, batch):
+    def _embed(self, batch: list[Image.Image]) -> np.ndarray:
     #Convert images into embeddings
         with torch.no_grad():
             inputs = self.processor(images=batch, return_tensors="pt").to(self.device)
@@ -39,7 +40,7 @@ class Embedder:
             embeddings = outputs.pooler_output.detach().cpu().numpy()
             return embeddings
 
-def create_embeddings_and_classifier():
+def create_embeddings_and_classifier() -> None:
     #load in relevant datasets and embedder
     embedder = Embedder()
     #Obtained from https://huggingface.co/datasets/ideepankarsharma2003/AIGeneratedImages_Midjourney
@@ -79,7 +80,7 @@ def create_embeddings_and_classifier():
     __output_metrics(clf, training_embedding_matrix, label_matrix, predicted_results)
 
 #Calculate relevant metrics and graphs for classifier performance
-def __output_metrics(clf, training_embedding_matrix, label_matrix, predicted_results):
+def __output_metrics(clf: LogisticRegression, training_embedding_matrix: np.ndarray, label_matrix: np.ndarray, predicted_results: np.ndarray) -> None:
     #Calculate relevant metrics and graph for the classifier
     print(classification_report(label_matrix, predicted_results))
     print(confusion_matrix(label_matrix, predicted_results))
@@ -88,14 +89,12 @@ def __output_metrics(clf, training_embedding_matrix, label_matrix, predicted_res
     _ = plot.ax_.set(xlabel="False Positive Rate", ylabel="True Positive Rate",
     title="Trainning AI vs Real Image Detection\nReceiver Operating Characteristic",
     )
-    plt.show()  
-
+    plt.show()
 
 #Function to begin the testing of the classifer and to produce relevant metrics pertineant to the project
-def test_classifier():
+def test_classifier() -> None:
     #load in relevant datasets and embedder
     embedder = Embedder() 
-    #Obtained from https://huggingface.co/datasets/ideepankarsharma2003/AIGeneratedImages_Midjourney
     #Obtained from https://huggingface.co/datasets/ideepankarsharma2003/AIGeneratedImages_Midjourney
     midjourney_matrix = embed_huggingface_datasets(embedder, "ideepankarsharma2003/AIGeneratedImages_Midjourney", "test", "test_embeddings_midjourney", 500, 128)
 
@@ -130,7 +129,7 @@ def test_classifier():
     #Output metrics of predictions
     __output_metrics(clf, training_embedding_matrix, label_matrix, predicted_results)
 
-def embed_huggingface_datasets(embedder, dataset, training_split, save_file_name, num_images, batch_size):
+def embed_huggingface_datasets(embedder: Embedder, dataset: str, training_split: str, save_file_name: str, num_images: int, batch_size: int) -> np.ndarray:
     images_list = load_dataset(dataset, split = training_split, streaming = True)
     embedding_list = []
     batch = []
@@ -149,7 +148,7 @@ def embed_huggingface_datasets(embedder, dataset, training_split, save_file_name
     np.save(save_file_name, embedding_matrix)
     return embedding_matrix 
 
-def embed_locally_saved_datasets(embedder, dataset_path, save_file_name, num_images, batch_size, index_start, index_end):
+def embed_locally_saved_datasets(embedder: Embedder, dataset_path: str, save_file_name: str, num_images: int, batch_size: int, index_start: int, index_end: int) -> np.ndarray:
     #Pull images from local path (Requires adjustment for given users machine) and store them locally 
     images = Path(dataset_path).glob('*.jpg')
     images_list = []
@@ -178,7 +177,7 @@ def embed_locally_saved_datasets(embedder, dataset_path, save_file_name, num_ima
     return embedding_matrix
 
 #Function to convert user's inputted image
-def convert_input_image(input):
+def convert_input_image(input: bytes) -> np.ndarray:
     #Instiate embedding object to load relevant models
     embedder = Embedder()
     #Convert incoming image bytes to image and Open image
@@ -188,7 +187,7 @@ def convert_input_image(input):
     return embedding
 
 #Function for Full stack application to predict image 
-def predict_image(input):
+def predict_image(input: bytes) -> dict:
     #Convert image to embeddings
     embeddings = convert_input_image(input)
 
@@ -200,3 +199,5 @@ def predict_image(input):
     #Create a JSON payload for the API to return, and return the predicted values, typecasting them to regular floats instead of numpy floats
     results_payload = {"class": int(predicted_class[0]), "probability_real": float(prob_real), "probability_ai": float(prob_fake)}
     return results_payload
+
+test_classifier()
