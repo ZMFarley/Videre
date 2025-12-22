@@ -3,7 +3,7 @@ import axios from 'axios';
 import loadingSpinner from "./loading_spinner.svg"
 /* Type to hold prediction from model from API request */
 type Prediction = {
-    class: number;
+    result: number;
     probReal: number;
     probAI: number;
 };
@@ -34,7 +34,7 @@ export default function UploadFile() {
                 { headers: {"Content-Type": "multipart/form-data"}}
             )
             // Adjust api response for proper intake and display 
-            setResponse({class: response.data.class, probReal: response.data.probability_real, probAI: response.data.probability_ai});
+            setResponse({result: response.data.result, probReal: response.data.probability_real, probAI: response.data.probability_ai});
             //Update page after analyization and prevent image from remaining upon return to original screen
             setPage("analysis");
             setImage(null);
@@ -72,10 +72,10 @@ export default function UploadFile() {
                     {/*Output section for results*/}
                     <div className="center">
                         {/*Conditionals to output model predictions*/}
-                        {response?.class === 0  && <h2>The model has predicted this image is NOT AI Generated</h2>}
-                        {response?.class === 1  && <h2>The model has predicted this image is AI Generated</h2>}
-                        {response?.class === 0  && <h3>with {(response?.probReal * 100).toFixed(2)}% certainty</h3>}
-                        {response?.class === 1  && <h3>with {(response?.probAI * 100).toFixed(2)}% certainty</h3>}
+                        {response?.result === 0  && <h2>The model has predicted this image is NOT AI Generated</h2>}
+                        {response?.result === 1  && <h2>The model has predicted this image is AI Generated</h2>}
+                        {response?.result === 0  && <h3>with {(response?.probReal * 100).toFixed(2)}% certainty</h3>}
+                        {response?.result === 1  && <h3>with {(response?.probAI * 100).toFixed(2)}% certainty</h3>}
 
                     </div>  
             
